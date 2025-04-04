@@ -1,10 +1,10 @@
-name: Toggle Branch Lock
+name: Toggle Branch Lock (develop)
 
 on:
   workflow_dispatch:
     inputs:
       lock:
-        description: 'Lock the develop branch'
+        description: 'Lock or unlock the develop branch'
         required: true
         type: choice
         options:
@@ -16,66 +16,19 @@ jobs:
   toggle-lock:
     runs-on: ubuntu-latest
     steps:
-      - name: Install jq
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v2
+
+      - name: Lock or Unlock develop branch
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
         run: |
-          if ! command -v jq &> /dev/null; then
-            echo "Installing jq..."
-            sudo apt-get update
-            sudo apt-get install -y jq
+          if [ "${{ github.event.inputs.lock }}" = "true" ]; then
+            echo "🔒 Locking develop branch..."
+            gh api --method PUT /repos/ka2-ya/jsonl-reader-writer/branches/develop/lock
+            echo "✅ Branch locked."
           else
-            echo "jq is already installed"
+            echo "🔓 Unlocking develop branch..."
+            gh api --method DELETE /repos/ka2-ya/jsonl-reader-writer/branches/develop/lock
+            echo "✅ Branch unlocked."
           fi
-
-      - name: Toggle Branch Lock
-        run: |
-          LOCK=${{ github.event.inputs.lock }}
-          echo "Setting branch lock status to: $LOCK"
-
-          API_URL="https://api.github.com/repos/ka2-ya/jsonl-reader-writer/branches/develop/protection"
-
-          AUTH_HEADER="Authorization: token ${{ secrets.TOKEN }}"
-          ACCEPT_HEADER="Accept: application/vnd.github+json"
-          VERSION_HEADER="X-GitHub-Api-Version: 2022-11-28"
-
-          echo "Fetching current branch protection settings..."
-
-          RESPONSE=$(curl -s -w "%{http_code}" \
-            -H "$AUTH_HEADER" \
-            -H "$ACCEPT_HEADER" \
-            -H "$VERSION_HEADER" \
-            "$API_URL")
-
-          HTTP_STATUS="${RESPONSE: -3}"
-          CURRENT_PROTECTION="${RESPONSE:0:${#RESPONSE}-3}"
-
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "Error fetching branch protection: HTTP status $HTTP_STATUS"
-            echo "Response: $CURRENT_PROTECTION"
-            exit 1
-          fi
-
-          echo "Successfully retrieved current branch protection settings"
-
-          NEW_PROTECTION=$(echo "$CURRENT_PROTECTION" | jq ".lock_branch = $LOCK")
-
-          echo "Updating branch protection settings..."
-
-          UPDATE_RESPONSE=$(curl -s -w "%{http_code}" \
-            -X PUT \
-            -H "$AUTH_HEADER" \
-            -H "$ACCEPT_HEADER" \
-            -H "$VERSION_HEADER" \
-            -H "Content-Type: application/json" \
-            "$API_URL" \
-            -d "$NEW_PROTECTION")
-
-          UPDATE_HTTP_STATUS="${UPDATE_RESPONSE: -3}"
-          UPDATE_BODY="${UPDATE_RESPONSE:0:${#UPDATE_RESPONSE}-3}"
-
-          if [ "$UPDATE_HTTP_STATUS" != "200" ]; then
-            echo "Error updating branch protection: HTTP status $UPDATE_HTTP_STATUS"
-            echo "Response: $UPDATE_BODY"
-            exit 1
-          fi
-
-          echo "Branch lock successfully updated to: $LOCK"
