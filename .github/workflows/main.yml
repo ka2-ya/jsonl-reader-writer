@@ -16,13 +16,13 @@ jobs:
   toggle-lock:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up GitHub CLI
-        uses: cli/cli-action@v2
-
       - name: Lock or Unlock develop branch
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
         run: |
+          echo "gh CLI version:"
+          gh --version
+
           if [ "${{ github.event.inputs.lock }}" = "true" ]; then
             echo "🔒 Locking develop branch..."
             gh api --method PUT /repos/ka2-ya/jsonl-reader-writer/branches/develop/lock
