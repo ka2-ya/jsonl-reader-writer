@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       lock:
-        description: 'Lock the release branch'
+        description: 'Lock the develop branch'
         required: true
         type: choice
         options:
@@ -25,47 +25,41 @@ jobs:
           else
             echo "jq is already installed"
           fi
+
       - name: Toggle Branch Lock
         run: |
-          # ロック状態を設定
           LOCK=${{ github.event.inputs.lock }}
           echo "Setting branch lock status to: $LOCK"
-          
-          # GitHub APIエンドポイント
-          API_URL="https://api.github.com/repos/lmi-mcs/mcs-org-api/branches/release/protection"
-          
-          # 共通のヘッダー
+
+          API_URL="https://api.github.com/repos/ka2-ya/jsonl-reader-writer/branches/develop/protection"
+
           AUTH_HEADER="Authorization: token ${{ secrets.TOKEN }}"
           ACCEPT_HEADER="Accept: application/vnd.github+json"
           VERSION_HEADER="X-GitHub-Api-Version: 2022-11-28"
-          
+
           echo "Fetching current branch protection settings..."
-          
-          # 現在のブランチ保護設定を取得
+
           RESPONSE=$(curl -s -w "%{http_code}" \
             -H "$AUTH_HEADER" \
             -H "$ACCEPT_HEADER" \
             -H "$VERSION_HEADER" \
             "$API_URL")
-          
+
           HTTP_STATUS="${RESPONSE: -3}"
           CURRENT_PROTECTION="${RESPONSE:0:${#RESPONSE}-3}"
-          
-          # エラーハンドリング
+
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "Error fetching branch protection: HTTP status $HTTP_STATUS"
             echo "Response: $CURRENT_PROTECTION"
             exit 1
           fi
-          
+
           echo "Successfully retrieved current branch protection settings"
-          
-          # 必要な設定を抽出して新しい設定を構築
+
           NEW_PROTECTION=$(echo "$CURRENT_PROTECTION" | jq ".lock_branch = $LOCK")
-          
+
           echo "Updating branch protection settings..."
-          
-          # ブランチ保護設定を更新
+
           UPDATE_RESPONSE=$(curl -s -w "%{http_code}" \
             -X PUT \
             -H "$AUTH_HEADER" \
@@ -74,15 +68,14 @@ jobs:
             -H "Content-Type: application/json" \
             "$API_URL" \
             -d "$NEW_PROTECTION")
-          
+
           UPDATE_HTTP_STATUS="${UPDATE_RESPONSE: -3}"
           UPDATE_BODY="${UPDATE_RESPONSE:0:${#UPDATE_RESPONSE}-3}"
-          
-          # 更新結果のエラーハンドリング
+
           if [ "$UPDATE_HTTP_STATUS" != "200" ]; then
             echo "Error updating branch protection: HTTP status $UPDATE_HTTP_STATUS"
             echo "Response: $UPDATE_BODY"
             exit 1
           fi
-          
+
           echo "Branch lock successfully updated to: $LOCK"
